@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   StreamReach,
   Observation,
@@ -15,7 +15,6 @@ import {
   Clock,
 } from 'lucide-react';
 import { InteractiveMapCanvas } from '../components/map/InteractiveMapCanvas.js';
-import { apiClient } from '../api/client.js';
 import { realtimeService } from '../services/realtime.js';
 import { formatRelativeTime } from '../utils/date.js';
 
@@ -46,9 +45,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onNavigateToWaterNetwork,
   onNavigateToSystemHealth,
 }) => {
-  const [activeScenarioName, setActiveScenarioName] = useState('Summer Storm Response');
-  const [isExecutingScenario, setIsExecutingScenario] = useState(false);
-
   // Real-time updates subscription
   useEffect(() => {
     const unsubscribe = realtimeService.subscribeAll(() => {
@@ -64,7 +60,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   );
 
   const incidentsCount = activeIncidents.length;
-
   const reachesCount = reaches.length;
 
   const openTasks = useMemo(
@@ -89,20 +84,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     if (incidents.length > 0) return incidents[0].updatedAt || incidents[0].createdAt;
     return null;
   }, [observations, incidents]);
-
-  // Execute demo scenario when "View scenario ->" is clicked
-  const handleTriggerScenario = async () => {
-    setIsExecutingScenario(true);
-    try {
-      await apiClient.executeCanonicalDemo();
-      setActiveScenarioName('Summer Storm Response (Active)');
-      onRefresh();
-    } catch (err) {
-      console.error('Scenario error:', err);
-    } finally {
-      setIsExecutingScenario(false);
-    }
-  };
 
   // Recent Incidents list (Dynamic from real incidents)
   const displayIncidents = useMemo(() => {
@@ -232,21 +213,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           <div className="hidden md:flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-600">
             <CloudRain size={12} className={latestWeather ? 'text-blue-500' : 'text-slate-400'} />
             <span className="font-semibold text-slate-800">
-              {latestWeather ? `${latestWeather.value}${latestWeather.unit || ''}` : '21°C / Rain 0mm'}
+              {latestWeather ? `${latestWeather.value}${latestWeather.unit || ''}` : 'Station Idle'}
             </span>
           </div>
-
-          {/* Trigger Scenario Button */}
-          <button
-            type="button"
-            onClick={handleTriggerScenario}
-            title={`Active Scenario: ${activeScenarioName}`}
-            disabled={isExecutingScenario}
-            className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold rounded-lg shadow-2xs transition"
-          >
-            <span>{isExecutingScenario ? 'Simulating...' : 'Run Scenario'}</span>
-            <ArrowRight size={11} />
-          </button>
 
           {/* Explore Network Button */}
           <button
@@ -318,15 +287,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <div className="p-1 bg-slate-50 rounded-lg border border-slate-100">
                   <span className="text-[9px] text-slate-400 block font-bold">Avg WQI</span>
                   <span className="text-xs font-bold text-slate-900 block mt-0.5">
-                    {indicatorsData.hasWqi ? indicatorsData.avgWqi : '78/100'}
+                    {indicatorsData.hasWqi ? `${indicatorsData.avgWqi}/100` : '—'}
                   </span>
-                  <span className="text-[8px] text-emerald-600 block">Good</span>
+                  <span className={`text-[8px] block ${indicatorsData.hasWqi ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {indicatorsData.hasWqi ? (indicatorsData.avgWqi! >= 80 ? 'Good' : 'Moderate') : 'Awaiting data'}
+                  </span>
                 </div>
 
                 <div className="p-1 bg-slate-50 rounded-lg border border-slate-100">
                   <span className="text-[9px] text-slate-400 block font-bold">Precip</span>
                   <span className="text-xs font-bold text-slate-900 block mt-0.5">
-                    {indicatorsData.hasRain ? `${indicatorsData.totalRain}mm` : '12.4mm'}
+                    {indicatorsData.hasRain ? `${indicatorsData.totalRain}mm` : '0.0 mm'}
                   </span>
                   <span className="text-[8px] text-blue-600 block">Rain gauge</span>
                 </div>
@@ -334,7 +305,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <div className="p-1 bg-slate-50 rounded-lg border border-slate-100">
                   <span className="text-[9px] text-slate-400 block font-bold">Citizen</span>
                   <span className="text-xs font-bold text-slate-900 block mt-0.5">
-                    {indicatorsData.citizenCount !== null ? indicatorsData.citizenCount : '3 reports'}
+                    {indicatorsData.citizenCount !== null ? `${indicatorsData.citizenCount} reports` : '0 reports'}
                   </span>
                   <span className="text-[8px] text-purple-600 block">Community</span>
                 </div>
@@ -438,16 +409,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
               <div className="space-y-1 text-[10px]">
                 {[
-                  { label: 'Ingestion Pipeline', ok: true },
-                  { label: 'Bayesian Engine', ok: true },
-                  { label: 'Outbox Transport', ok: true },
-                  { label: 'FHIR R4 Adapter', ok: true },
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <span className="text-slate-600 truncate">{item.label}</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  </div>
-                ))}
+                  { label: 'Ingestion Pipeline', status: health?.services?.database?.status === 'up' ? 'up' : 'down' },
+                  { label: 'Evidence Engine', status: health?.services?.recommendationEngine?.status === 'up' ? 'up' : 'down' },
+                  { label: 'Outbox Transport', status: health?.services?.eventSystem?.status === 'up' ? 'up' : 'down' },
+                  { label: 'FHIR R4 Boundary', status: health?.services?.fhir?.status === 'up' ? 'up' : health?.services?.fhir?.status === 'mocked' ? 'mocked' : 'down' },
+                ].map((item, idx) => {
+                  const isUp = item.status === 'up';
+                  const isMock = item.status === 'mocked';
+                  const dotColor = isUp ? 'bg-emerald-500' : isMock ? 'bg-amber-500' : 'bg-rose-500';
+                  return (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="text-slate-600 truncate">{item.label}</span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

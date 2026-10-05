@@ -7,7 +7,7 @@ import {
   Radio,
   Compass,
   Send,
-  Plus,
+  RefreshCw,
   Sparkles,
 } from 'lucide-react';
 import { formatRelativeTime } from '../utils/date.js';
@@ -56,7 +56,6 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
   const [reachFilter, setReachFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [inspectorTab, setInspectorTab] = useState<'OVERVIEW' | 'EVIDENCE' | 'TIMELINE' | 'RECOMMENDATIONS'>('OVERVIEW');
-  const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
   const [isFieldOpsModalOpen, setIsFieldOpsModalOpen] = useState(false);
 
   // Real incidents from application state
@@ -102,13 +101,6 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
         counts.SUPERSEDED++;
       }
     });
-    // Ensure healthy visual baseline matching reference
-    if (counts.ACTIVE === 0) counts.ACTIVE = 12;
-    if (counts.UNDER_REVIEW === 0) counts.UNDER_REVIEW = 4;
-    if (counts.CONFIRMED === 0) counts.CONFIRMED = 7;
-    if (counts.RESOLVED === 0) counts.RESOLVED = 18;
-    if (counts.REJECTED === 0) counts.REJECTED = 2;
-    if (counts.SUPERSEDED === 0) counts.SUPERSEDED = 1;
     return counts;
   }, [allIncidents]);
 
@@ -241,11 +233,12 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
 
           <button
             type="button"
-            onClick={() => setIsSimulateModalOpen(true)}
-            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1 rounded-lg shadow-2xs transition"
+            onClick={() => onRefresh?.()}
+            className="flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold px-2.5 py-1 rounded-lg shadow-2xs transition"
+            title="Refresh Incidents Queue"
           >
-            <Plus size={12} />
-            <span>Simulate Incident</span>
+            <RefreshCw size={12} />
+            <span>Refresh Queue</span>
           </button>
         </div>
       </div>
@@ -686,34 +679,6 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
         </div>
       </div>
 
-      {/* Simulation Modal */}
-      <Modal isOpen={isSimulateModalOpen} onClose={() => setIsSimulateModalOpen(false)} title="Simulate Environmental Incident">
-        <div className="space-y-3 text-xs">
-          <p className="text-slate-600">Select an incident scenario to dispatch into the live event bus:</p>
-          <div className="space-y-2">
-            {[
-              { id: 'ALGAL_BLOOM', name: 'Cyanobacteria Algal Bloom (Sentinel-2 + In-Situ)', sev: 'HIGH' },
-              { id: 'CHEMICAL_SPILL', name: 'Industrial Chemical Runoff (Turbidity surge)', sev: 'CRITICAL' },
-              { id: 'SEWAGE_OVERFLOW', name: 'Combined Sewer Overflow (E. coli)', sev: 'MEDIUM' },
-            ].map((scen) => (
-              <button
-                key={scen.id}
-                onClick={() => {
-                  setIsSimulateModalOpen(false);
-                  onRefresh?.();
-                }}
-                className="w-full p-2.5 rounded-xl border border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/50 flex items-center justify-between transition text-left"
-              >
-                <div>
-                  <span className="font-bold text-slate-800 block">{scen.name}</span>
-                  <span className="text-[10px] text-slate-500">Reach: Almyros Stream Alpha</span>
-                </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">{scen.sev}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </Modal>
 
       {/* Field Ops Modal */}
       <Modal isOpen={isFieldOpsModalOpen} onClose={() => setIsFieldOpsModalOpen(false)} title="Dispatch Field Crew Verification">

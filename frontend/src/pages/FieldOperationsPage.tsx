@@ -19,7 +19,6 @@ import {
   Radio,
   Plus,
   RefreshCw,
-  PlayCircle,
   X,
   BarChart3,
   Bookmark,
@@ -27,7 +26,7 @@ import {
 } from 'lucide-react';
 
 interface FieldOperationsPageProps {
-  defaultTab?: 'verifications' | 'analytics' | 'demo';
+  defaultTab?: 'verifications' | 'analytics';
   tasks?: Task[];
   selectedTaskId?: string | null;
   onSelectTask?: (taskId: string | null) => void;
@@ -77,7 +76,6 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
   const [isEditAssignmentOpen, setIsEditAssignmentOpen] = useState(false);
   const [isViewAllActivityOpen, setIsViewAllActivityOpen] = useState(false);
   const [selectedPhotoDetail, setSelectedPhotoDetail] = useState<FieldObservationItem | null>(null);
-  const [showDemoRunnerModal, setShowDemoRunnerModal] = useState(false);
 
   // Outcome Review Modal
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -89,12 +87,8 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
   const [assignedTeamName, setAssignedTeamName] = useState('Field Operations Team');
   const [assignedPriority, setAssignedPriority] = useState('High');
 
-  // Demo Runner State
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoResult, setDemoResult] = useState<any | null>(null);
-
   // Active Lifecycle Stage (0: Preparation, 1: Dispatch, 2: On site, 3: Data collection, 4: Complete)
-  const [activeStage, setActiveStage] = useState<number>(2);
+  const [activeStage, setActiveStage] = useState<number>(0);
 
   // Dynamic Observations State
   const [observations, setObservations] = useState<FieldObservationItem[]>([]);
@@ -110,8 +104,39 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
   const [newObsNotes, setNewObsNotes] = useState('');
 
   // Find currently selected task
-  const activeTask = tasks.find((t) => t.id === selectedTaskId) || null;
-  const reachData = reaches.find((r) => r.id === (activeTask as any)?.reachId) || reaches[0] || null;
+  const activeTask = tasks.find((t) => t.id === selectedTaskId) || tasks[0] || null;
+  const reachData = reaches.find((r) => r.id === (activeTask as any)?.reachId || (activeTask as any)?.streamReachId) || null;
+
+  // Sync active lifecycle stage to current task status
+  useEffect(() => {
+    if (activeTask?.status) {
+      switch (activeTask.status) {
+        case 'DRAFT':
+        case 'REQUESTED':
+          setActiveStage(0);
+          break;
+        case 'APPROVED':
+        case 'ASSIGNED':
+        case 'ACCEPTED':
+          setActiveStage(1);
+          break;
+        case 'IN_PROGRESS':
+          setActiveStage(2);
+          break;
+        case 'AWAITING_VERIFICATION':
+          setActiveStage(3);
+          break;
+        case 'COMPLETED':
+        case 'VERIFIED':
+          setActiveStage(4);
+          break;
+        default:
+          setActiveStage(0);
+      }
+    } else {
+      setActiveStage(0);
+    }
+  }, [activeTask]);
 
   const loadVerifications = async () => {
     try {
@@ -170,6 +195,16 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
 
   useEffect(() => {
     loadVerifications();
+  }, [tasks, selectedTaskId]);
+
+  useEffect(() => {
+    const handleReset = () => {
+      setVerifications([]);
+      setObservations([]);
+      setActivities([]);
+    };
+    window.addEventListener('aquasentinel:reset-state', handleReset);
+    return () => window.removeEventListener('aquasentinel:reset-state', handleReset);
   }, []);
 
   const handleConfirmOutcome = async (outcomeType: OperationalOutcomeType, notes: string) => {
@@ -183,24 +218,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
     if (onRefresh) onRefresh();
   };
 
-  const runDemoScenario = async (scenario: 'A' | 'B' | 'C' | 'ALL') => {
-    try {
-      setDemoLoading(true);
-      setDemoResult(null);
-      let res;
-      if (scenario === 'A') res = await apiClient.runPhase8ScenarioA();
-      else if (scenario === 'B') res = await apiClient.runPhase8ScenarioB();
-      else if (scenario === 'C') res = await apiClient.runPhase8ScenarioC();
-      else res = await apiClient.runPhase8ExecuteAll();
-      setDemoResult(res);
-      await loadVerifications();
-      if (onRefresh) onRefresh();
-    } catch (err: any) {
-      setDemoResult({ error: err.message || 'Execution failed' });
-    } finally {
-      setDemoLoading(false);
-    }
-  };
+
 
   const handleAddObservationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -330,16 +348,6 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* Deterministic Demos Trigger Button */}
-          <button
-            type="button"
-            onClick={() => setShowDemoRunnerModal(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[11px] font-semibold shadow-2xs transition"
-            title="Open Phase 8 Deterministic Scenario Runner"
-          >
-            <PlayCircle className="w-3.5 h-3.5 text-blue-600" />
-            <span>Deterministic Demos</span>
-          </button>
 
           {/* Refresh Button */}
           <button
@@ -363,20 +371,26 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-blue-600 font-bold text-[10px] tracking-wider uppercase">
                 <Bookmark className="w-3 h-3 fill-blue-600" />
-                <span>FIELD OPERATION ACTIVE</span>
+                <span>{activeTask ? 'FIELD OPERATION ACTIVE' : 'NO DISPATCHED TASKS'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  IN PROGRESS
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                  activeTask
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                    : 'bg-slate-50 text-slate-500 border border-slate-200/60'
+                }`}>
+                  {activeTask && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                  {activeTask ? (activeTask.status || 'IN PROGRESS').replace(/_/g, ' ') : 'STANDBY'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setIsUpdateProgressOpen(true)}
-                  className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
-                >
-                  <MoreHorizontal className="w-3.5 h-3.5" />
-                </button>
+                {activeTask && (
+                  <button
+                    type="button"
+                    onClick={() => setIsUpdateProgressOpen(true)}
+                    className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -384,7 +398,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight truncate">
                 {activeTask
-                  ? `${activeTask.title} — ${(activeTask as any).reachId || 'Basin Reach'}`
+                  ? `${activeTask.title} — ${reachData?.name || (activeTask as any).reachId || 'Catchment Reach'}`
                   : 'Field Operations & Ground Verification'}
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
@@ -410,7 +424,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
                 <div className="min-w-0">
                   <span className="text-[9px] text-slate-400 block uppercase font-bold">Task</span>
                   <span className="text-[11px] font-bold text-slate-900 truncate block">
-                    {activeTask ? `TSK-${activeTask.id.slice(0, 4)}` : 'TSK-001'}
+                    {activeTask ? `TSK-${activeTask.id.slice(0, 4)}` : '—'}
                   </span>
                 </div>
               </div>
@@ -430,7 +444,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
                 <div className="min-w-0">
                   <span className="text-[9px] text-slate-400 block uppercase font-bold">Incident</span>
                   <span className="text-[11px] font-bold text-slate-900 truncate block">
-                    {activeTask?.incidentId ? `INC-${activeTask.incidentId.slice(0, 4)}` : 'INC-001'}
+                    {activeTask?.incidentId ? `INC-${activeTask.incidentId.slice(0, 4)}` : '—'}
                   </span>
                 </div>
               </div>
@@ -443,7 +457,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
                 <div className="min-w-0">
                   <span className="text-[9px] text-slate-400 block uppercase font-bold">Reach</span>
                   <span className="text-[11px] font-bold text-slate-900 truncate block">
-                    {reachData ? reachData.name : 'Reach-004'}
+                    {reachData ? reachData.name : '—'}
                   </span>
                 </div>
               </div>
@@ -456,7 +470,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
                 <div className="min-w-0">
                   <span className="text-[9px] text-slate-400 block uppercase font-bold">Crew</span>
                   <span className="text-[11px] font-bold text-slate-900 truncate block">
-                    {assignedTeamName}
+                    {activeTask ? assignedTeamName : '—'}
                   </span>
                 </div>
               </div>
@@ -619,7 +633,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
                   <span>Target Reach</span>
                 </span>
                 <span className="font-semibold text-slate-900 truncate max-w-[150px]">
-                  {reachData ? reachData.name : 'Reach-004'}
+                  {reachData ? reachData.name : '—'}
                 </span>
               </div>
 
@@ -628,15 +642,19 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
                   <Calendar className="w-3 h-3 text-blue-600" />
                   <span>Scheduled Window</span>
                 </span>
-                <span className="font-medium text-slate-800">Today, 14:00 - 18:00</span>
+                <span className="font-medium text-slate-800">
+                  {activeTask ? scheduledWindow : '—'}
+                </span>
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-slate-400">
                   <Clock className="w-3 h-3 text-blue-600" />
-                  <span>Started</span>
+                  <span>Created / Dispatched</span>
                 </span>
-                <span className="font-medium text-slate-800">14:15 local</span>
+                <span className="font-medium text-slate-800">
+                  {activeTask?.createdAt ? formatRelativeTime(activeTask.createdAt) : '—'}
+                </span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -1185,121 +1203,7 @@ export const FieldOperationsPage: React.FC<FieldOperationsPageProps> = ({
         </div>
       )}
 
-      {/* MODAL 7: DETERMINISTIC DEMO RUNNER MODAL */}
-      {showDemoRunnerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <PlayCircle className="w-5 h-5 text-blue-600" />
-                  Deterministic Closed-Loop Response Scenarios
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Execute Phase 8 scenarios to verify autonomous dispatch, false-alarm suppression, and follow-up
-                </p>
-              </div>
-              <button
-                onClick={() => setShowDemoRunnerModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* Scenario A */}
-                <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between space-y-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase bg-emerald-100 px-2 py-0.5 rounded-md">
-                      Scenario A
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5">Confirmed Contamination</h4>
-                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                      Satellite NDCI anomaly → Task assigned → Inspector observes green foam → Proposes CONFIRMED.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => runDemoScenario('A')}
-                    disabled={demoLoading}
-                    className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs disabled:opacity-50"
-                  >
-                    Run Scenario A
-                  </button>
-                </div>
-
-                {/* Scenario B */}
-                <div className="p-3.5 rounded-xl border border-cyan-200 bg-cyan-50/40 flex flex-col justify-between space-y-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-cyan-700 uppercase bg-cyan-100 px-2 py-0.5 rounded-md">
-                      Scenario B
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5">False Alarm</h4>
-                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                      Remote sensing artifact → Inspector verifies clean water → NOT_CONFIRMED proposed & archived.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => runDemoScenario('B')}
-                    disabled={demoLoading}
-                    className="w-full py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold shadow-2xs disabled:opacity-50"
-                  >
-                    Run Scenario B
-                  </button>
-                </div>
-
-                {/* Scenario C */}
-                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 flex flex-col justify-between space-y-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-amber-700 uppercase bg-amber-100 px-2 py-0.5 rounded-md">
-                      Scenario C
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5">Uncertain / Follow-Up</h4>
-                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                      Ambiguous brown runoff → ADDITIONAL_VERIFICATION_REQUIRED → Secondary lab sampling triggered.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => runDemoScenario('C')}
-                    disabled={demoLoading}
-                    className="w-full py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-2xs disabled:opacity-50"
-                  >
-                    Run Scenario C
-                  </button>
-                </div>
-              </div>
-
-              {/* Run All */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Execute End-to-End Test Suite</h4>
-                  <p className="text-[11px] text-slate-500">Run all 3 deterministic scenarios sequentially</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => runDemoScenario('ALL')}
-                  disabled={demoLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${demoLoading ? 'animate-spin' : ''}`} />
-                  <span>{demoLoading ? 'Running...' : 'Execute All 3'}</span>
-                </button>
-              </div>
-
-              {/* Execution Results */}
-              {demoResult && (
-                <div className="bg-slate-900 rounded-xl p-4 text-xs font-mono text-cyan-300 max-h-48 overflow-y-auto">
-                  <pre>{JSON.stringify(demoResult, null, 2)}</pre>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* OUTCOME REVIEW MODAL */}
       <OutcomeReviewModal

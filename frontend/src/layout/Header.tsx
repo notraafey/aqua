@@ -4,7 +4,6 @@ import {
   Sun,
   ChevronDown,
   RefreshCw,
-  Play,
   RotateCcw,
 } from 'lucide-react';
 import { HealthCheckResponse } from '@aquasentinel/shared';
@@ -36,24 +35,10 @@ export const Header: React.FC<HeaderProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCatchment] = useState('Basin Command');
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [isRunningScenario, setIsRunningScenario] = useState(false);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     onSearch?.(e.target.value);
-  };
-
-  const handleRunCanonical = async () => {
-    setIsRunningScenario(true);
-    setShowUserMenu(false);
-    try {
-      await apiClient.executeCanonicalDemo();
-      onRefreshData?.();
-    } catch (err) {
-      console.error('Scenario execution failed:', err);
-    } finally {
-      setIsRunningScenario(false);
-    }
   };
 
   const handleResetDemo = async () => {
@@ -124,28 +109,28 @@ export const Header: React.FC<HeaderProps> = ({
             <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-700" />
           </div>
 
-          {/* User & Demo Scenario Menu Dropdown */}
+          {/* Operator Profile Dropdown */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-2 z-50 text-xs">
+            <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-2 z-50 text-xs">
               <div className="px-4 py-2 border-b border-slate-100">
                 <p className="font-bold text-slate-900">Jordan Diaz</p>
                 <p className="text-[11px] text-slate-400">jordan.diaz@aquasentinel.io</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] text-slate-500 font-medium">Role: Operations Command</span>
+                </div>
+              </div>
+              <div className="px-4 py-2 text-[10px] text-slate-500 border-b border-slate-100 bg-slate-50/50">
+                <span className="font-semibold block text-slate-700">Jurisdiction</span>
+                <span>Pagasetic Basin Water Authority</span>
               </div>
               <div className="py-1">
                 <button
-                  onClick={handleRunCanonical}
-                  disabled={isRunningScenario}
-                  className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                >
-                  <Play size={13} className="text-blue-600" />
-                  <span>Run Lifecycle Scenario</span>
-                </button>
-                <button
                   onClick={handleResetDemo}
-                  className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                  className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
                 >
-                  <RotateCcw size={13} className="text-amber-600" />
-                  <span>Reset Demo State</span>
+                  <RotateCcw size={12} className="text-slate-400" />
+                  <span>Reset Environment State</span>
                 </button>
               </div>
             </div>

@@ -116,6 +116,27 @@ export const StreamReachesPage: React.FC<StreamReachesPageProps> = ({
     );
   }, [allReaches, selectedReachCode, selectedReachId]);
 
+
+  const currentReachObs = useMemo(() => {
+    if (!currentReach) return [];
+    return observations.filter((o) => o.streamReachId === currentReach.id);
+  }, [observations, currentReach]);
+
+  const latestDO = useMemo(() => {
+    const doObs = currentReachObs.find((o) => o.indicator === 'DISSOLVED_OXYGEN');
+    return doObs ? `${doObs.value} ${doObs.unit || 'mg/L'}` : null;
+  }, [currentReachObs]);
+
+  const latestNDCI = useMemo(() => {
+    const ndciObs = currentReachObs.find(
+      (o) => o.indicator === 'NDCI' || o.source === 'SATELLITE_SENTINEL2'
+    );
+    if (ndciObs && !isNaN(Number(ndciObs.value))) {
+      return Number(ndciObs.value).toFixed(2);
+    }
+    return null;
+  }, [currentReachObs]);
+
   // Filtered reaches for the table
   const filteredReaches = useMemo(() => {
     return allReaches.filter((r) => {
@@ -315,27 +336,49 @@ export const StreamReachesPage: React.FC<StreamReachesPageProps> = ({
               <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200/80 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-emerald-950 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                     Surveillance Baseline State
                   </span>
                   <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-mono font-bold text-[10px]">
-                    NORMAL
+                    {currentReach.status.toUpperCase()}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs pt-0.5">
                   <div className="bg-white/80 p-1.5 rounded-md border border-emerald-100">
-                    <span className="text-slate-500 block text-[10px]">Historical Dissolved Oxygen</span>
-                    <span className="font-bold text-slate-900">~8.2 mg/L</span>
-                    <span className="text-[10px] text-emerald-600 block">Baseline range 7.8 - 8.6</span>
+                    <span className="text-slate-500 block text-[10px]">Dissolved Oxygen</span>
+                    <span className="font-bold text-slate-900">
+                      {latestDO || '—'}
+                    </span>
+                    <span className="text-[10px] text-emerald-600 block">
+                      {latestDO ? 'Observed Telemetry' : 'Nominal Baseline'}
+                    </span>
                   </div>
                   <div className="bg-white/80 p-1.5 rounded-md border border-emerald-100">
                     <span className="text-slate-500 block text-[10px]">Chlorophyll Proxy (NDCI)</span>
-                    <span className="font-bold text-slate-900">&lt; 0.15 (0.12)</span>
-                    <span className="text-[10px] text-emerald-600 block">Sub-Threshold</span>
+                    {latestNDCI ? (
+                      <>
+                        <span className="font-bold text-emerald-600 text-xs flex items-center gap-1.5">
+                          {latestNDCI}
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold uppercase tracking-tight">
+                            Detected
+                          </span>
+                        </span>
+                        <span className="text-[10px] text-emerald-600 block font-medium">Sentinel-2 MSI</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold text-slate-900">&lt; 0.15</span>
+                        <span className="text-[10px] text-emerald-600 block">Sub-Threshold Baseline</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <p className="text-[10px] text-emerald-800/90 italic">
-                  Conditions nominal. No water-quality threshold breaches; no reason to intervene.
+                  {currentReach.status === 'Alert' || currentReach.status === 'Degraded'
+                    ? 'Active anomaly detected in reach. Multi-source observations require corroboration and operational response triage.'
+                    : currentReach.status === 'Watch'
+                    ? 'Reach under surveillance watch. Early sensor deviations detected within baseline tolerance parameters.'
+                    : 'Conditions nominal. Monitored water quality parameters remain within historical baseline tolerances.'}
                 </p>
               </div>
             </div>

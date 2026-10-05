@@ -97,8 +97,9 @@ export const App: React.FC = () => {
       setResponseOpsSubTab('field-ops');
     } else if (tab === 'map') {
       setWaterNetworkSubTab('map');
-    } else if (tab === 'reaches') {
+    } else if (tab === 'reaches' || tab === 'water-network') {
       setWaterNetworkSubTab('reaches');
+      if (entityId) setSelectedReachId(entityId);
     } else if (tab === 'incidents') {
       setSelectedIncidentId(entityId || null);
     } else if (tab === 'evidence' || tab === 'monitoring-evidence') {

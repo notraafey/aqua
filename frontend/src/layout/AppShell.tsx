@@ -2,7 +2,6 @@ import React from 'react';
 import { Header } from './Header.js';
 import { Sidebar, NavTab } from './Sidebar.js';
 import { HealthCheckResponse } from '@aquasentinel/shared';
-import { DemoControlBar } from '../components/demo/DemoControlBar.js';
 
 interface AppShellProps {
   currentTab: NavTab;
@@ -60,14 +59,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           currentTab={currentTab}
         />
 
-        {/* Dedicated Incident Lifecycle Controller */}
-        <DemoControlBar
-          onNavigate={onNavigate || onSelectTab}
-          onRefreshData={onRefreshData}
-          onResetState={onResetState}
-        />
-
-        {/* Zero-Scroll Single-Viewport Canvas */}
+        {/* Normal Zero-Scroll Single-Viewport Canvas */}
         <main className="flex-1 min-h-0 overflow-hidden px-4 py-2.5 flex flex-col">
           <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
             {children}

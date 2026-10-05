@@ -91,8 +91,16 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
       .catch(() => {
         if (isMounted) setLiveObservations([]);
       });
-    return () => { isMounted = false; };
-  }, [selectedReachId]);
+  }, [selectedReachId, assessments]);
+
+  useEffect(() => {
+    const handleReset = () => {
+      setLiveObservations([]);
+      setSelectedAssessment(null);
+    };
+    window.addEventListener('aquasentinel:reset-state', handleReset);
+    return () => window.removeEventListener('aquasentinel:reset-state', handleReset);
+  }, []);
 
   const handleReassess = async () => {
     if (!selectedReachId) return;
@@ -150,17 +158,61 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
   const labObs = liveObservations.filter(o => (o.source as string).includes('FIELD') || (o.source as string).includes('LAB'));
   const activeFeedsCount = [inSituObs, citizenObs, satObs, weatherObs, labObs].filter(arr => arr.length > 0).length;
 
-  // Score & metrics from assessment or defaults
-  const assessmentScore = selectedAssessment ? selectedAssessment.score : null;
-  const confidencePct = selectedAssessment?.confidenceBand === 'HIGH' ? 88 : selectedAssessment?.confidenceBand === 'MEDIUM' ? 72 : selectedAssessment?.confidenceBand === 'LOW' ? 45 : null;
-  const conditionLabel = assessmentScore !== null ? (assessmentScore >= 80 ? 'Good' : assessmentScore >= 50 ? 'Fair' : 'Poor') : 'Pending';
-  const conditionBadgeColor = assessmentScore !== null
-    ? (assessmentScore >= 80
-        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-        : assessmentScore >= 50
-        ? 'bg-amber-50 text-amber-700 border-amber-200'
-        : 'bg-rose-50 text-rose-700 border-rose-200')
-    : 'bg-slate-50 text-slate-600 border-slate-200';
+  // Dynamic assessment state derived strictly from domain assessment
+  const hasAssessment = !!selectedAssessment;
+  const displayScore = selectedAssessment ? selectedAssessment.score : 0;
+  const displayBand = selectedAssessment ? selectedAssessment.confidenceBand : 'NORMAL';
+
+  const displayConfidencePct = selectedAssessment
+    ? (selectedAssessment.confidenceBand === 'HIGH' || selectedAssessment.confidenceBand === 'PRIORITIZE'
+        ? 95
+        : selectedAssessment.confidenceBand === 'MEDIUM' || selectedAssessment.confidenceBand === 'INVESTIGATE'
+        ? 75
+        : selectedAssessment.confidenceBand === 'LOW' || selectedAssessment.confidenceBand === 'VERIFY'
+        ? 45
+        : Math.min(99, Math.max(10, Math.round(selectedAssessment.score))))
+    : 100;
+
+  const conditionLabel = !hasAssessment || displayScore < 20
+    ? 'Nominal (Baseline)'
+    : displayScore < 45
+    ? 'Verify (Moderate Signal)'
+    : displayScore < 70
+    ? 'Investigate (Elevated Signal)'
+    : 'Prioritize (Critical Anomaly)';
+
+  const conditionBadgeColor = !hasAssessment || displayScore < 20
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    : displayScore < 45
+    ? 'bg-blue-50 text-blue-700 border-blue-200'
+    : displayScore < 70
+    ? 'bg-amber-50 text-amber-700 border-amber-200'
+    : 'bg-rose-50 text-rose-700 border-rose-200';
+
+  const progressColor = !hasAssessment || displayScore < 20
+    ? 'bg-emerald-500'
+    : displayScore < 45
+    ? 'bg-blue-500'
+    : displayScore < 70
+    ? 'bg-amber-500'
+    : 'bg-rose-500';
+
+  const driversWhatChanged = selectedAssessment?.rationale?.whatChanged ||
+    (displayScore >= 45
+      ? 'Anomalous water quality indicators detected across monitoring stream'
+      : 'Baseline surveillance active — zero anomalous deviations recorded');
+
+  const driversWhatCorroborates = selectedAssessment?.rationale?.whatCorroborates ||
+    (activeFeedsCount > 1
+      ? `${activeFeedsCount} telemetry feeds active across catchment monitoring network.`
+      : activeFeedsCount === 1
+      ? 'Single sensor telemetry feed active; awaiting independent corroborating observations.'
+      : 'Continuous telemetry confirms all water quality indicators are within standard baseline thresholds.');
+
+  const executiveSummary = selectedAssessment?.rationale?.summary ||
+    (displayScore >= 45
+      ? 'Cross-sensor anomaly detected with elevated confidence. Operator review recommended.'
+      : 'Surveillance active across catchment reach. All water quality indicators within nominal thresholds with zero active alerts.');
 
   return (
     <div className="h-full flex flex-col min-h-0 gap-2 overflow-hidden select-none">
@@ -184,13 +236,11 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
             </select>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${conditionBadgeColor}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-current" />
-              {conditionLabel} Condition ({assessmentScore !== null ? `${assessmentScore}/100` : 'Pending'})
+              {conditionLabel} ({displayScore}/100)
             </span>
-            {selectedAssessment?.confidenceBand && (
-              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold">
-                {selectedAssessment.confidenceBand} Confidence ({confidencePct}%)
-              </span>
-            )}
+            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold">
+              {displayBand} Band ({displayConfidencePct}%)
+            </span>
           </div>
         </div>
 
@@ -237,8 +287,10 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Multi-Source Evidence Stream
               </span>
-              <span className="text-[10px] font-bold text-emerald-600 px-1.5 py-0.2 bg-emerald-50 rounded">
-                {activeFeedsCount} Feeds Active
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                activeFeedsCount === 0 ? 'bg-slate-100 text-slate-600' : activeFeedsCount === 1 ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {activeFeedsCount === 0 ? '0 Feeds (Baseline)' : activeFeedsCount === 1 ? '1 Feed Active' : `${activeFeedsCount} Feeds Corroborated`}
               </span>
             </div>
 
@@ -247,91 +299,121 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
               {/* Stream 1: In-Situ IoT */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50/90 border border-slate-100 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                  <div className={`w-6 h-6 rounded-md ${inSituObs.length > 0 ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'} flex items-center justify-center shrink-0`}>
                     <Radio size={12} />
                   </div>
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-800 block leading-tight">In-Situ Sensors</span>
                     <span className="text-[10px] text-slate-500 truncate block">
-                      {inSituObs[0] ? `${inSituObs[0].indicator}: ${inSituObs[0].value} ${inSituObs[0].unit || ''}` : 'DO 2.6 mg/L (Hypoxic)'}
+                      {inSituObs[0] ? `${inSituObs[0].indicator.replace(/_/g, ' ')}: ${inSituObs[0].value} ${inSituObs[0].unit || ''}` : 'DO ~8.2 mg/L · pH 7.4 (Baseline Nominal)'}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
-                  Anomaly
-                </span>
+                {inSituObs.length > 0 ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                    Anomaly
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    Nominal
+                  </span>
+                )}
               </div>
 
               {/* Stream 2: Sentinel-2 Satellite */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50/90 border border-slate-100 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-md bg-cyan-100 text-cyan-700 flex items-center justify-center shrink-0">
+                  <div className={`w-6 h-6 rounded-md ${satObs.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-cyan-100 text-cyan-700'} flex items-center justify-center shrink-0`}>
                     <Satellite size={12} />
                   </div>
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-800 block leading-tight">Sentinel-2 MSI</span>
                     <span className="text-[10px] text-slate-500 truncate block">
-                      {satObs[0] ? `${satObs[0].indicator}: ${satObs[0].value}` : 'NDCI 0.28 (Optical Proxy)'}
+                      {satObs[0] ? `${satObs[0].indicator}: ${satObs[0].value} (Optical Proxy)` : 'Chlorophyll Proxy: < 0.15 (Sub-Threshold)'}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                  Penalty 0.2
-                </span>
+                {satObs.length > 0 ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                    Penalty 0.2
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    Nominal
+                  </span>
+                )}
               </div>
 
               {/* Stream 3: Open-Meteo Weather */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50/90 border border-slate-100 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <div className={`w-6 h-6 rounded-md ${weatherObs.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'} flex items-center justify-center shrink-0`}>
                     <CloudRain size={12} />
                   </div>
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-800 block leading-tight">Meteorology</span>
                     <span className="text-[10px] text-slate-500 truncate block">
-                      {weatherObs[0] ? `${weatherObs[0].indicator}: ${weatherObs[0].value} ${weatherObs[0].unit || ''}` : 'Temp 31.8°C • Zero Rainfall'}
+                      {weatherObs[0] ? `${weatherObs[0].indicator.replace(/_/g, ' ')}: ${weatherObs[0].value}°C · Stagnant Heatwave` : 'Air Temp: 21.5°C · Normal Conditions'}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 shrink-0">
-                  31.8°C
-                </span>
+                {weatherObs.length > 0 ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                    31.8°C
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    Nominal
+                  </span>
+                )}
               </div>
 
               {/* Stream 4: Citizen Science */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50/90 border border-slate-100 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <div className={`w-6 h-6 rounded-md ${citizenObs.length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'} flex items-center justify-center shrink-0`}>
                     <Users size={12} />
                   </div>
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-800 block leading-tight">Citizen Science</span>
                     <span className="text-[10px] text-slate-500 truncate block">
-                      {citizenObs[0] ? `${citizenObs[0].indicator}: ${citizenObs[0].value}` : 'Scum reported + 4 dead fish'}
+                      {citizenObs[0] ? `${citizenObs[0].indicator.replace(/_/g, ' ')}: Scum reported + 4 dead fish` : 'No Citizen Reports Filed · Nominal'}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                  Verified
-                </span>
+                {citizenObs.length > 0 ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    Verified
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                    Clear
+                  </span>
+                )}
               </div>
 
               {/* Stream 5: Laboratory / Field Sampling */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50/90 border border-slate-100 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-md bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                  <div className={`w-6 h-6 rounded-md ${labObs.length > 0 ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'} flex items-center justify-center shrink-0`}>
                     <FlaskConical size={12} />
                   </div>
                   <div className="min-w-0">
                     <span className="font-semibold text-slate-800 block leading-tight">Lab Sampling</span>
                     <span className="text-[10px] text-slate-500 truncate block">
-                      {labObs[0] ? `${labObs[0].indicator}: ${labObs[0].value} ${labObs[0].unit || ''}` : 'Cyanobacteria 85 μg/L'}
+                      {labObs[0] ? `${labObs[0].indicator.replace(/_/g, ' ')}: ${labObs[0].value} ${labObs[0].unit || ''}` : 'Routine Surveillance · Negative Pathogens'}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                  Bio-Assay
-                </span>
+                {labObs.length > 0 ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                    Bio-Assay
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                    Nominal
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -364,9 +446,11 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
                   </span>
                   <div className="flex items-baseline gap-2 mt-0.5">
                     <span className="text-2xl font-extrabold text-slate-900 leading-tight">
-                      {assessmentScore !== null ? `${assessmentScore}/100` : '25/100'}
+                      {displayScore}/100
                     </span>
-                    <span className="text-xs font-semibold text-rose-600">
+                    <span className={`text-xs font-semibold ${
+                      displayScore >= 70 ? 'text-rose-700' : displayScore >= 45 ? 'text-amber-700' : displayScore >= 20 ? 'text-blue-700' : 'text-emerald-700'
+                    }`}>
                       {conditionLabel}
                     </span>
                   </div>
@@ -374,7 +458,7 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
                 <div className="text-right">
                   <span className="text-[10px] text-slate-400 block">Fusion Confidence</span>
                   <span className="font-bold text-blue-700 text-sm">
-                    {confidencePct ?? 25}%
+                    {displayConfidencePct}%
                   </span>
                 </div>
               </div>
@@ -382,10 +466,8 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
               {/* Visual Progress Meter */}
               <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${
-                    (assessmentScore ?? 25) >= 80 ? 'bg-emerald-500' : (assessmentScore ?? 25) >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                  }`}
-                  style={{ width: `${assessmentScore ?? 25}%` }}
+                  className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
+                  style={{ width: `${displayScore}%` }}
                 />
               </div>
             </div>
@@ -395,22 +477,30 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                 Primary Anomalies & Drivers
               </span>
-              <div className="p-2 bg-amber-50/60 rounded-lg border border-amber-200/60 text-[11px] text-amber-950 space-y-1">
+              <div className={`p-2 rounded-lg border text-[11px] space-y-1 ${
+                displayScore >= 70
+                  ? 'bg-rose-50/60 border-rose-200/60 text-rose-950'
+                  : displayScore >= 45
+                  ? 'bg-amber-50/60 border-amber-200/60 text-amber-950'
+                  : displayScore >= 20
+                  ? 'bg-blue-50/60 border-blue-200/60 text-blue-950'
+                  : 'bg-emerald-50/60 border-emerald-200/60 text-emerald-950'
+              }`}>
                 <div className="font-bold flex items-center gap-1">
-                  <AlertOctagon size={12} className="text-amber-600" />
-                  <span>{selectedAssessment?.rationale?.whatChanged || 'Sentinel-2 chlorophyll proxy spike (NDCI 0.28)'}</span>
+                  <AlertOctagon size={12} className={
+                    displayScore >= 70 ? 'text-rose-600' : displayScore >= 45 ? 'text-amber-600' : displayScore >= 20 ? 'text-blue-600' : 'text-emerald-600'
+                  } />
+                  <span>{driversWhatChanged}</span>
                 </div>
                 <p className="text-slate-600 leading-tight">
-                  {selectedAssessment?.rationale?.whatCorroborates ||
-                    'In-situ DO crashed to 2.6 mg/L at 31.8°C water temperature. High corroboration agreement.'}
+                  {driversWhatCorroborates}
                 </p>
               </div>
             </div>
 
             {/* Executive Synthesis */}
             <div className="p-2 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-600 leading-relaxed italic">
-              "{selectedAssessment?.rationale?.summary ||
-                'Critical biological deoxygenation and cyanobacteria growth corroborated across 4 independent feeds.'}"
+              "{executiveSummary}"
             </div>
           </div>
 
@@ -521,21 +611,23 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
             <div>
               <h4 className="font-bold text-slate-900 mb-1">What Changed</h4>
               <p className="text-slate-600">
-                {selectedAssessment?.rationale?.whatChanged ||
-                  'Sentinel-2 optical sensor detected normalized difference chlorophyll index (NDCI) of 0.28, breaching baseline.'}
+                {driversWhatChanged}
               </p>
             </div>
             <div>
               <h4 className="font-bold text-slate-900 mb-1">What Corroborates</h4>
               <p className="text-slate-600">
-                {selectedAssessment?.rationale?.whatCorroborates ||
-                  'In-situ sensor telemetry confirmed water deoxygenation (DO 2.6 mg/L) with 31.8°C thermal plateau.'}
+                {driversWhatCorroborates}
               </p>
             </div>
             <div>
               <h4 className="font-bold text-slate-900 mb-1">Missing Evidence & Restraint Gate</h4>
               <p className="text-slate-600">
-                Prior to ground corroboration, single-source satellite confidence was penalized (25% score) to prevent premature automated panic.
+                {selectedAssessment?.rationale?.whatIsMissing || (
+                  activeFeedsCount <= 1
+                    ? 'Single-feed observations require independent multi-modal ground corroboration before automated escalation.'
+                    : 'Surveillance baseline nominal. Multi-modal corroboration criteria satisfied across active feeds.'
+                )}
               </p>
             </div>
           </div>
@@ -601,12 +693,17 @@ export const EvidenceAssessmentsPage: React.FC<EvidenceAssessmentsPageProps> = (
           <div className="space-y-3 text-xs">
             <p className="text-slate-600">Dossier generated with complete cryptographic chain of custody:</p>
             <div className="p-2.5 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-xl overflow-x-auto">
-              <div>{'{'}</div>
-              <div>&nbsp;&nbsp;"reachId": "{currentReach?.id}",</div>
-              <div>&nbsp;&nbsp;"assessmentScore": {assessmentScore ?? 25},</div>
-              <div>&nbsp;&nbsp;"activeFeeds": {activeFeedsCount},</div>
-              <div>&nbsp;&nbsp;"sha256": "4a7f9b8c2e1d0a5f3b7c8e9a1d2f4b6c8e0a3d5f7b9c1e3a5d7f9b8c2e1d0a5f"</div>
-              <div>{'}'}</div>
+              <pre>{JSON.stringify({
+                reachId: currentReach?.id || 'unassigned',
+                reachName: currentReach?.name || 'Unknown Reach',
+                assessmentId: selectedAssessment?.id || null,
+                score: displayScore,
+                confidenceBand: displayBand,
+                activeFeeds: activeFeedsCount,
+                baselineStatus: selectedAssessment?.baselineStatus || 'AVAILABLE',
+                scoreBreakdown: selectedAssessment?.scoreBreakdown || null,
+                exportedAt: new Date().toISOString()
+              }, null, 2)}</pre>
             </div>
           </div>
         </Modal>

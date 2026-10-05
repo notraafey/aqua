@@ -21,8 +21,6 @@ import {
   Copy,
   Check,
   RefreshCw,
-  PlayCircle,
-  X,
   Shield,
   Globe,
   Users,
@@ -68,10 +66,7 @@ export const InteroperabilityPage: React.FC<InteroperabilityPageProps> = ({
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showDemoModal, setShowDemoModal] = useState(false);
   const [showPipelineStatsModal, setShowPipelineStatsModal] = useState(false);
-  const [demoRunning, setDemoRunning] = useState(false);
-  const [demoResult, setDemoResult] = useState<any | null>(null);
 
   // Overview Data from API
   const [overview, setOverview] = useState<InteroperabilityOverviewResponse | null>(null);
@@ -169,23 +164,7 @@ export const InteroperabilityPage: React.FC<InteroperabilityPageProps> = ({
     }
   };
 
-  const runDemoScenario = async (type: 'golden' | 'failure' | 'duplicate' | 'deadletter') => {
-    setDemoRunning(true);
-    setDemoResult(null);
-    try {
-      let res;
-      if (type === 'golden') res = await apiClient.runInteroperabilityGoldenPath();
-      else if (type === 'failure') res = await apiClient.runInteroperabilitySimulateFailure();
-      else if (type === 'duplicate') res = await apiClient.runInteroperabilitySimulateDuplicate();
-      else res = await apiClient.runInteroperabilitySimulateDeadLetter();
-      setDemoResult(res);
-      await loadData(true);
-    } catch (err: any) {
-      setDemoResult({ error: err.message || 'Execution error' });
-    } finally {
-      setDemoRunning(false);
-    }
-  };
+
 
   // Filtered Events
   const filteredEvents = useMemo(() => {
@@ -400,16 +379,6 @@ export const InteroperabilityPage: React.FC<InteroperabilityPageProps> = ({
             <span>Consumers & Stats</span>
           </button>
 
-          {/* Phase 7 Demos Trigger */}
-          <button
-            type="button"
-            onClick={() => setShowDemoModal(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[11px] font-semibold shadow-2xs transition"
-          >
-            <PlayCircle className="w-3.5 h-3.5 text-blue-600" />
-            <span>Phase 7 Demos</span>
-          </button>
-
           {/* Refresh Button */}
           <button
             type="button"
@@ -442,7 +411,7 @@ export const InteroperabilityPage: React.FC<InteroperabilityPageProps> = ({
           <span className="text-slate-300 font-bold">→</span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="font-bold text-slate-700">Downstream Systems (5 active)</span>
+            <span className="font-bold text-slate-700">Downstream Systems ({consumerStats.filter(c => c.count > 0).length || 4} configured)</span>
           </div>
         </div>
 
@@ -713,135 +682,7 @@ export const InteroperabilityPage: React.FC<InteroperabilityPageProps> = ({
         />
       )}
 
-      {/* MODAL 2: PHASE 7 DETERMINISTIC DEMO RUNNER */}
-      {showDemoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <PlayCircle className="w-5 h-5 text-blue-600" />
-                  Phase 7 Deterministic Interoperability Demos
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Verify transactional outbox pattern, FHIR R4 transformation, and retry semantics
-                </p>
-              </div>
-              <button
-                onClick={() => setShowDemoModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Demo 1: Golden Path */}
-                <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between space-y-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase bg-emerald-100 px-2 py-0.5 rounded-md">
-                      Scenario 1
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5">Golden Path Delivery</h4>
-                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                      Publishes IncidentDetected &rarr; Transforms to FHIR Observation &rarr; Receives HTTP 200 ACK from Public Health.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => runDemoScenario('golden')}
-                    disabled={demoRunning}
-                    className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs disabled:opacity-50"
-                  >
-                    Run Golden Path
-                  </button>
-                </div>
-
-                {/* Demo 2: Failure & Retry */}
-                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 flex flex-col justify-between space-y-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-amber-700 uppercase bg-amber-100 px-2 py-0.5 rounded-md">
-                      Scenario 2
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5">Failure & Exponential Retry</h4>
-                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                      Simulates downstream HTTP 503 unavailable &rarr; Exponential backoff schedule logged in outbox.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => runDemoScenario('failure')}
-                    disabled={demoRunning}
-                    className="w-full py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-2xs disabled:opacity-50"
-                  >
-                    Simulate Failure
-                  </button>
-                </div>
-
-                {/* Demo 3: Idempotency */}
-                <div className="p-3.5 rounded-xl border border-cyan-200 bg-cyan-50/40 flex flex-col justify-between space-y-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-cyan-700 uppercase bg-cyan-100 px-2 py-0.5 rounded-md">
-                      Scenario 3
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5">Duplicate Suppression</h4>
-                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                      Re-delivers duplicate Message ID &rarr; Outbox deduplication gate suppresses secondary transmission.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => runDemoScenario('duplicate')}
-                    disabled={demoRunning}
-                    className="w-full py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold shadow-2xs disabled:opacity-50"
-                  >
-                    Simulate Duplicate
-                  </button>
-                </div>
-
-                {/* Demo 4: Dead-Letter Queue */}
-                <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/40 flex flex-col justify-between space-y-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-rose-700 uppercase bg-rose-100 px-2 py-0.5 rounded-md">
-                      Scenario 4
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-900 mt-1.5">Dead-Letter Queue & Replay</h4>
-                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                      Exhausts max retries &rarr; Moves event to Dead-Letter state &rarr; Manual operator replay trigger.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => runDemoScenario('deadletter')}
-                    disabled={demoRunning}
-                    className="w-full py-1.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-2xs disabled:opacity-50"
-                  >
-                    Simulate Dead Letter
-                  </button>
-                </div>
-              </div>
-
-              {/* Execution Results */}
-              {demoResult && (
-                <div className="bg-slate-900 rounded-xl p-4 text-xs font-mono text-cyan-300 max-h-48 overflow-y-auto">
-                  <pre>{JSON.stringify(demoResult, null, 2)}</pre>
-                </div>
-              )}
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowDemoModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL 3: PIPELINE HEALTH & CONSUMERS */}
       {showPipelineStatsModal && (

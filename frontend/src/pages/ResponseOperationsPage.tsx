@@ -27,6 +27,12 @@ export const ResponseOperationsPage: React.FC<ResponseOperationsPageProps> = ({
 }) => {
   const [subTab, setSubTab] = useState<ResponseOperationsSubTab>(initialSubTab);
 
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
   const activeTasksCount = tasks.filter((t) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length;
 
   return (

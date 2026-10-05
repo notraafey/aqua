@@ -11,7 +11,6 @@ import { Modal } from '../components/common/Modal.js';
 import { formatRelativeTime } from '../utils/date.js';
 import {
   CheckCircle2,
-  Play,
   FileCode,
   ShieldAlert,
   AlertTriangle,
@@ -56,8 +55,6 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({
   const [inspectFhirRec, setInspectFhirRec] = useState<Recommendation | null>(null);
   const [fhirDraftJson, setFhirDraftJson] = useState<string | null>(null);
   const [isLoadingFhir, setIsLoadingFhir] = useState(false);
-  const [showSimModal, setShowSimModal] = useState(false);
-  const [isRunningScenario, setIsRunningScenario] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showEvidenceModal, setShowEvidenceModal] = useState(false);
@@ -155,19 +152,7 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({
     }
   };
 
-  const handleRunDemoScenario = async (scenarioId: string) => {
-    setIsRunningScenario(true);
-    try {
-      await apiClient.executeDemoScenario(scenarioId);
-      setShowSimModal(false);
-      await loadData();
-      onRefresh();
-    } catch (err: any) {
-      alert(`Scenario execution failed: ${err.message}`);
-    } finally {
-      setIsRunningScenario(false);
-    }
-  };
+
 
   const handleInspectFhir = async () => {
     if (!activeRec) return;
@@ -264,15 +249,6 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({
 
           <button
             type="button"
-            onClick={() => setShowSimModal(true)}
-            className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shadow-2xs transition"
-          >
-            <Play size={12} className="text-blue-600" />
-            <span>Simulation</span>
-          </button>
-
-          <button
-            type="button"
             onClick={handleInspectFhir}
             className="flex items-center gap-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shadow-2xs transition"
           >
@@ -291,14 +267,6 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({
           <p className="text-[11px] text-slate-500 max-w-sm mx-auto mt-0.5">
             All automated policy directives have been reviewed, or no current incidents require remediation proposals.
           </p>
-          <button
-            type="button"
-            onClick={() => setShowSimModal(true)}
-            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition"
-          >
-            <Play size={12} />
-            <span>Simulate Scenario</span>
-          </button>
         </div>
       ) : (
         /* 2. ZERO-SCROLL 2-COLUMN SPLIT CONSOLE */
@@ -668,42 +636,7 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({
         </Modal>
       )}
 
-      {/* MODAL 2: Simulation Engine Modal */}
-      {showSimModal && (
-        <Modal
-          isOpen={showSimModal}
-          onClose={() => setShowSimModal(false)}
-          title="Municipal Simulation Engine"
-        >
-          <div className="space-y-3 text-xs text-slate-700">
-            <p className="text-slate-600">
-              Execute standardized multi-scenario stress tests to evaluate automated recommendation triggering and Bayesian confidence convergence.
-            </p>
-            <div className="space-y-2">
-              {[
-                { id: 'SCENARIO_A', title: 'Scenario A: Multi-Source Severe Bloom', desc: 'Sentinel-2 + In-situ DO depletion + Citizen reports' },
-                { id: 'SCENARIO_B', title: 'Scenario B: Low-Confidence Single-Source', desc: 'Isolated telemetry spike without satellite agreement' },
-                { id: 'SCENARIO_C', title: 'Scenario C: Heavy Runoff & Storm Surge', desc: 'High precipitation + Turbidity surge' },
-                { id: 'SCENARIO_D', title: 'Scenario D: Cloud Cover Contradiction', desc: 'Optical ambiguity test' },
-              ].map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => handleRunDemoScenario(s.id)}
-                  disabled={isRunningScenario}
-                  className="w-full text-left p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 transition flex items-center justify-between group bg-white shadow-2xs"
-                >
-                  <div>
-                    <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition">{s.title}</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{s.desc}</p>
-                  </div>
-                  <Play size={13} className="text-blue-600 shrink-0 ml-2 group-hover:translate-x-0.5 transition" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </Modal>
-      )}
+
 
       {/* MODAL 3: FHIR CarePlan / ISO Record Modal */}
       {inspectFhirRec && (
