@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: aquasentinel-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aquasentinel
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aquasentinel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  hapi-fhir:
+    image: hapiproject/hapi:v6.8.0
+    container_name: aquasentinel-hapi-fhir
+    ports:
+      - "8080:8080"
+    environment:
+      - hapi.fhir.fhir_version=R4
+      - hapi.fhir.subscription.resthook_enabled=true
+      - hapi.fhir.subscription.websocket_enabled=false
+      - hapi.fhir.subscription.email_enabled=false
+      - hapi.fhir.tester.home.name=Local Tester
+      - hapi.fhir.tester.home.server_address=http://localhost:8080/fhir
+      - hapi.fhir.tester.home.refuse_to_fetch_third_party_urls=false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/fhir/metadata || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: aquasentinel-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - APP_MODE=demo
+      - PORT=3001
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/aquasentinel
+      - FHIR_SERVER_URL=http://hapi-fhir:8080/fhir
+      - LOG_LEVEL=info
+      - CORS_ORIGIN=*
+      - API_SECRET_KEY=aquasentinel-docker-secret-key
+      - EXTERNAL_CONSUMER_URL=http://consumer:3002/webhook/fhir
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  consumer:
+    build:
+      context: .
+      dockerfile: consumer/Dockerfile
+    container_name: aquasentinel-consumer
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - CONSUMER_PORT=3002
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: aquasentinel-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

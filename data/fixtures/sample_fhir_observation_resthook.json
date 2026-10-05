@@ -1,0 +1,31 @@
+{
+  "resourceType": "Observation",
+  "id": "5",
+  "meta": {
+    "versionId": "1",
+    "lastUpdated": "2026-09-15T14:02:56.792+00:00",
+    "source": "#WAXX5Eyq5nsCkTyK",
+    "profile": [
+      "http://hl7.eu/fhir/ig/oah/StructureDefinition/observation-indicators-oah"
+    ]
+  },
+  "status": "final",
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.eu/fhir/ig/oah/CodeSystem/temporarySystem-oah-eu",
+        "code": "ndci"
+      }
+    ]
+  },
+  "subject": {
+    "reference": "Location/loc-stream-test"
+  },
+  "effectiveDateTime": "2026-09-15T12:02:00Z",
+  "valueQuantity": {
+    "value": 0.70,
+    "unit": "NDCI",
+    "system": "http://unitsofmeasure.org",
+    "code": "1"
+  }
+}

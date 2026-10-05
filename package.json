@@ -1,0 +1,29 @@
+{
+  "name": "aquasentinel-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AquaSentinel: Autonomous Water Contamination Incident Detection & Supervised Response System",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend",
+    "consumer"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:consumer": "npm run dev --workspace=consumer",
+    "start:consumer": "npm run start --workspace=consumer",
+    "dev:all": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\" \"npm run dev --workspace=consumer\"",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspace=backend",
+    "test:all": "npm run test --workspaces --if-present",
+    "migrate": "npm run migrate --workspace=backend",
+    "seed": "npm run seed --workspace=backend",
+    "demo:reset": "npm run demo:reset --workspace=backend",
+    "demo:canonical": "npm run demo:canonical --workspace=backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "id": "7a3b4c12-89de-4f56-9abc-1234567890ab",
+    "name": "Almyros Stream - Reach Alpha",
+    "city": "Volos",
+    "region": "Thessaly, Greece",
+    "monitoringStatus": "ACTIVE",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [22.7510, 39.1820],
+        [22.7535, 39.1812],
+        [22.7570, 39.1798],
+        [22.7610, 39.1785]
+      ]
+    },
+    "waterCoverageConstraint": {
+      "minWidthMeters": 15,
+      "confidencePenalty": 0.2
+    },
+    "baselineData": {
+      "typicalNdci": 0.12,
+      "typicalTurbidity": 4.5,
+      "typicalTempC": 18.5,
+      "lastUpdated": "2026-09-01T00:00:00.000Z"
+    },
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "updatedAt": "2026-09-01T00:00:00.000Z"
+  },
+  {
+    "id": "8b4c5d23-90ef-5a67-abcd-2345678901bc",
+    "name": "Kladissos River - Estuary Segment",
+    "city": "Chania",
+    "region": "Crete, Greece",
+    "monitoringStatus": "ACTIVE",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [24.0020, 35.5140],
+        [24.0050, 35.5132],
+        [24.0090, 35.5115]
+      ]
+    },
+    "waterCoverageConstraint": {
+      "minWidthMeters": 20,
+      "confidencePenalty": 0.15
+    },
+    "baselineData": {
+      "typicalNdci": 0.08,
+      "typicalTurbidity": 3.8,
+      "typicalTempC": 19.2,
+      "lastUpdated": "2026-09-01T00:00:00.000Z"
+    },
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "updatedAt": "2026-09-01T00:00:00.000Z"
+  }
+]
